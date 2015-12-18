@@ -269,6 +269,7 @@ routine.")
     (modify-syntax-entry ?*  ". 23b" st)
     (modify-syntax-entry ?/  ". 12c" st)
     (modify-syntax-entry ?\n "> c" st)
+    (modify-syntax-entry ?\\ "." st)
     st))
 
 (defmacro opascal-save-excursion (&rest forms)
