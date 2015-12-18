@@ -1782,5 +1782,5 @@ Coloring:
   (setq-local comment-start-skip "\\(?://\\|(\\*\\|{\\)[ \t]*")
   (setq-local comment-end-skip "[ \t]*\\(?:\n\\|\\*)\\|}\\)"))
 
-(provide 'opascal)
+(provide 'opascal (list 'delphi))
 ;;; opascal.el ends here
