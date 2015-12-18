@@ -1,4 +1,4 @@
-;;; delphi.el --- major mode for editing Object Pascal source in Emacs  -*- lexical-binding: t -*-
+;;; opascal.el --- major mode for editing Object Pascal source in Emacs  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 1998-1999, 2001-2015 Free Software Foundation, Inc.
 
@@ -24,35 +24,35 @@
 
 ;;; Commentary:
 
-;; To enter Delphi mode when you find an Object Pascal source file, one must
-;; override the auto-mode-alist to associate Delphi with .pas (and .dpr and
+;; To enter OPascal mode when you find an Object Pascal source file, one must
+;; override the auto-mode-alist to associate OPascal with .pas (and .dpr and
 ;; .dpk) files.  Emacs, by default, will otherwise enter Pascal mode. E.g.
 ;;
-;; (autoload 'delphi-mode "delphi")
+;; (autoload 'opascal-mode "opascal")
 ;; (add-to-list 'auto-mode-alist
-;;              '("\\.\\(pas\\|dpr\\|dpk\\)\\'" . delphi-mode))
+;;              '("\\.\\(pas\\|dpr\\|dpk\\)\\'" . opascal-mode))
 
-;; When you have entered Delphi mode, you may get more info by pressing
+;; When you have entered OPascal mode, you may get more info by pressing
 ;; C-h m.
 
-;; This Delphi mode implementation is fairly tolerant of syntax errors,
+;; This OPascal mode implementation is fairly tolerant of syntax errors,
 ;; relying as much as possible on the indentation of the previous statement.
 ;; This also makes it faster and simpler, since there is less searching for
 ;; properly constructed beginnings.
 
 ;;; Code:
 
-(defgroup delphi nil
-  "Major mode for editing Delphi source in Emacs."
+(defgroup opascal nil
+  "Major mode for editing OPascal source in Emacs."
   :version "24.4"
   :group 'languages)
 
-(defconst delphi-debug nil
+(defconst opascal-debug nil
   "True if in debug mode.")
 
 (define-obsolete-variable-alias
   'delphi-search-path 'opascal-search-path "24.4")
-(defcustom delphi-search-path "."
+(defcustom opascal-search-path "."
   "Directories to search when finding external units.
 It is a list of directory strings.  If only a single directory,
 it can be a single string instead of a list.  If a directory
@@ -61,8 +61,8 @@ ends in \"...\" then that directory is recursively searched."
 
 (define-obsolete-variable-alias
   'delphi-indent-level 'opascal-indent-level "24.4")
-(defcustom delphi-indent-level 3
-  "Indentation of Delphi statements with respect to containing block.
+(defcustom opascal-indent-level 3
+  "Indentation of OPascal statements with respect to containing block.
 E.g.
 
 begin
@@ -72,7 +72,7 @@ end;"
 
 (define-obsolete-variable-alias
   'delphi-compound-block-indent 'opascal-compound-block-indent "24.4")
-(defcustom delphi-compound-block-indent 0
+(defcustom opascal-compound-block-indent 0
   "Extra indentation for blocks in compound statements.  E.g.
 
 // block indent = 0     vs      // block indent = 2
@@ -86,7 +86,7 @@ end;                            else
 
 (define-obsolete-variable-alias
   'delphi-case-label-indent 'opascal-case-label-indent "24.4")
-(defcustom delphi-case-label-indent delphi-indent-level
+(defcustom opascal-case-label-indent opascal-indent-level
   "Extra indentation for case statement labels.  E.g.
 
 // case indent = 0      vs      // case indent = 3
@@ -99,22 +99,22 @@ end;                            end;"
   :type 'integer)
 
 (define-obsolete-variable-alias 'delphi-verbose 'opascal-verbose "24.4")
-(defcustom delphi-verbose t ; nil
-  "If true then Delphi token processing progress is reported to the user."
+(defcustom opascal-verbose t ; nil
+  "If true then OPascal token processing progress is reported to the user."
   :type 'boolean)
 
 (define-obsolete-variable-alias
   'delphi-tab-always-indents 'opascal-tab-always-indents "24.4")
-(defcustom delphi-tab-always-indents tab-always-indent
-  "Non-nil means `delphi-tab' should always reindent the current line.
+(defcustom opascal-tab-always-indents tab-always-indent
+  "Non-nil means `opascal-tab' should always reindent the current line.
 That is, regardless of where in the line point is at the time."
   :type 'boolean)
 
-(make-obsolete-variable 'delphi-tab-always-indents
+(make-obsolete-variable 'opascal-tab-always-indents
                         "use `indent-for-tab-command' and `tab-always-indent'."
                         "24.4")
 
-(defconst delphi-directives
+(defconst opascal-directives
   '(absolute abstract assembler automated cdecl default dispid dynamic
     export external far forward index inline message name near nodefault
     overload override pascal private protected public published read readonly
@@ -122,7 +122,7 @@ That is, regardless of where in the line point is at the time."
     virtual write writeonly)
   "OPascal4 directives.")
 
-(defconst delphi-keywords
+(defconst opascal-keywords
   (append
    '(;; Keywords.
      and array as asm at begin case class const constructor contains
@@ -137,125 +137,125 @@ That is, regardless of where in the line point is at the time."
      break exit)
 
    ;; We want directives to look like keywords.
-   delphi-directives)
+   opascal-directives)
   "OPascal4 keywords.")
 
-(defconst delphi-previous-terminators `(semicolon comma)
+(defconst opascal-previous-terminators `(semicolon comma)
   "Expression/statement terminators that denote a previous expression.")
 
-(defconst delphi-comments
+(defconst opascal-comments
   '(comment-single-line comment-multi-line-1 comment-multi-line-2)
   "Tokens that represent comments.")
 
-(defconst delphi-strings
+(defconst opascal-strings
   '(string double-quoted-string)
   "Tokens that represent string literals.")
 
-(defconst delphi-whitespace `(space newline ,@delphi-comments)
+(defconst opascal-whitespace `(space newline ,@opascal-comments)
   "Tokens that are considered whitespace.")
 
-(defconst delphi-routine-statements
+(defconst opascal-routine-statements
   '(procedure function constructor destructor property)
   "Marks the start of a routine, or routine-ish looking expression.")
 
-(defconst delphi-body-expr-statements '(if while for on)
+(defconst opascal-body-expr-statements '(if while for on)
   "Statements that have either a single statement or a block as a body and also
 are followed by an expression.")
 
-(defconst delphi-expr-statements `(case ,@delphi-body-expr-statements)
+(defconst opascal-expr-statements `(case ,@opascal-body-expr-statements)
   "Expression statements contain expressions after their keyword.")
 
-(defconst delphi-body-statements `(else ,@delphi-body-expr-statements)
+(defconst opascal-body-statements `(else ,@opascal-body-expr-statements)
   "Statements that have either a single statement or a block as a body.")
 
-(defconst delphi-expr-delimiters '(then do of)
+(defconst opascal-expr-delimiters '(then do of)
   "Expression delimiter tokens.")
 
-(defconst delphi-binary-ops
+(defconst opascal-binary-ops
   '(plus minus equals not-equals times divides div mod and or xor)
-  "Delphi binary operations.")
+  "OPascal binary operations.")
 
-(defconst delphi-visibilities '(public private protected published automated)
+(defconst opascal-visibilities '(public private protected published automated)
   "Class visibilities.")
 
-(defconst delphi-block-statements
+(defconst opascal-block-statements
   '(begin try case repeat initialization finalization asm)
   "Statements that contain multiple substatements.")
 
-(defconst delphi-mid-block-statements
-  `(except finally ,@delphi-visibilities)
+(defconst opascal-mid-block-statements
+  `(except finally ,@opascal-visibilities)
   "Statements that mark mid sections of the enclosing block.")
 
-(defconst delphi-end-block-statements `(end until)
+(defconst opascal-end-block-statements `(end until)
   "Statements that end block sections.")
 
-(defconst delphi-match-block-statements
-  `(,@delphi-end-block-statements ,@delphi-mid-block-statements)
+(defconst opascal-match-block-statements
+  `(,@opascal-end-block-statements ,@opascal-mid-block-statements)
   "Statements that match the indentation of the parent block.")
 
-(defconst delphi-decl-sections '(type const var label resourcestring)
+(defconst opascal-decl-sections '(type const var label resourcestring)
   "Denotes the start of a declaration section.")
 
-(defconst delphi-interface-types '(dispinterface interface)
+(defconst opascal-interface-types '(dispinterface interface)
   "Interface types.")
 
-(defconst delphi-class-types '(class object)
+(defconst opascal-class-types '(class object)
   "Class types.")
 
-(defconst delphi-composite-types
-  `(,@delphi-class-types ,@delphi-interface-types record)
+(defconst opascal-composite-types
+  `(,@opascal-class-types ,@opascal-interface-types record)
   "Types that contain declarations within them.")
 
-(defconst delphi-unit-sections
+(defconst opascal-unit-sections
   '(interface implementation program library package)
   "Unit sections within which the indent is 0.")
 
-(defconst delphi-use-clauses `(uses requires exports contains)
+(defconst opascal-use-clauses `(uses requires exports contains)
   "Statements that refer to foreign symbols.")
 
-(defconst delphi-unit-statements
-  `(,@delphi-use-clauses ,@delphi-unit-sections initialization finalization)
+(defconst opascal-unit-statements
+  `(,@opascal-use-clauses ,@opascal-unit-sections initialization finalization)
   "Statements indented at level 0.")
 
-(defconst delphi-decl-delimiters
-  `(,@delphi-decl-sections ,@delphi-unit-statements
-    ,@delphi-routine-statements)
+(defconst opascal-decl-delimiters
+  `(,@opascal-decl-sections ,@opascal-unit-statements
+    ,@opascal-routine-statements)
   "Statements that a declaration statement should align with.")
 
-(defconst delphi-decl-matchers
-  `(begin ,@delphi-decl-sections)
+(defconst opascal-decl-matchers
+  `(begin ,@opascal-decl-sections)
   "Statements that should match to declaration statement indentation.")
 
-(defconst delphi-enclosing-statements
-  `(,@delphi-block-statements ,@delphi-mid-block-statements
-    ,@delphi-decl-sections ,@delphi-use-clauses ,@delphi-routine-statements)
+(defconst opascal-enclosing-statements
+  `(,@opascal-block-statements ,@opascal-mid-block-statements
+    ,@opascal-decl-sections ,@opascal-use-clauses ,@opascal-routine-statements)
   "Delimits an enclosing statement.")
 
-(defconst delphi-previous-statements
-  `(,@delphi-unit-statements ,@delphi-routine-statements)
+(defconst opascal-previous-statements
+  `(,@opascal-unit-statements ,@opascal-routine-statements)
   "Delimits a previous statement.")
 
-(defconst delphi-previous-enclosing-statements
-  `(,@delphi-block-statements ,@delphi-mid-block-statements
-    ,@delphi-decl-sections)
+(defconst opascal-previous-enclosing-statements
+  `(,@opascal-block-statements ,@opascal-mid-block-statements
+    ,@opascal-decl-sections)
   "Delimits a previous enclosing statement.")
 
-(defconst delphi-begin-enclosing-tokens
-  `(,@delphi-block-statements ,@delphi-mid-block-statements)
+(defconst opascal-begin-enclosing-tokens
+  `(,@opascal-block-statements ,@opascal-mid-block-statements)
   "Tokens that a begin token indents from.")
 
-(defconst delphi-begin-previous-tokens
-  `(,@delphi-decl-sections ,@delphi-routine-statements)
+(defconst opascal-begin-previous-tokens
+  `(,@opascal-decl-sections ,@opascal-routine-statements)
   "Tokens that a begin token aligns with, but only if not part of a nested
 routine.")
 
-(defconst delphi-space-chars "\000-\011\013- ") ; all except \n
-(defconst delphi-non-space-chars (concat "^" delphi-space-chars))
-(defconst delphi-spaces-re (concat "[" delphi-space-chars "]*"))
-(defconst delphi-leading-spaces-re (concat "^" delphi-spaces-re))
-(defconst delphi-word-chars "a-zA-Z0-9_")
+(defconst opascal-space-chars "\000-\011\013- ") ; all except \n
+(defconst opascal-non-space-chars (concat "^" opascal-space-chars))
+(defconst opascal-spaces-re (concat "[" opascal-space-chars "]*"))
+(defconst opascal-leading-spaces-re (concat "^" opascal-spaces-re))
+(defconst opascal-word-chars "a-zA-Z0-9_")
 
-(defvar delphi-mode-syntax-table
+(defvar opascal-mode-syntax-table
   (let ((st (make-syntax-table)))
     ;; Strings.
     (modify-syntax-entry ?\" "\"" st)
@@ -270,7 +270,7 @@ routine.")
     (modify-syntax-entry ?\n "> c" st)
     st))
 
-(defmacro delphi-save-excursion (&rest forms)
+(defmacro opascal-save-excursion (&rest forms)
   ;; Executes the forms such that any movements have no effect, including
   ;; searches.
   `(save-excursion
@@ -279,98 +279,98 @@ routine.")
             (deactivate-mark nil))
         (progn ,@forms)))))
 
-(defsubst delphi-is (element in-set)
+(defsubst opascal-is (element in-set)
   ;; If the element is in the set, the element cdr is returned, otherwise nil.
   (memq element in-set))
 
-(defun delphi-string-of (start end)
+(defun opascal-string-of (start end)
   ;; Returns the buffer string from start to end.
   (buffer-substring-no-properties start end))
 
-(defun delphi-looking-at-string (p s)
+(defun opascal-looking-at-string (p s)
   ;; True if point p marks the start of string s. s is not a regular
   ;; expression.
   (let ((limit (+ p (length s))))
     (and (<= limit (point-max))
-         (string= s (delphi-string-of p limit)))))
+         (string= s (opascal-string-of p limit)))))
 
-(defun delphi-token-of (kind start end)
+(defun opascal-token-of (kind start end)
   ;; Constructs a token from a kind symbol and its start/end points.
   `[,kind ,start ,end])
 
-(defsubst delphi-token-kind (token)
+(defsubst opascal-token-kind (token)
   ;; Returns the kind symbol of the token.
   (if token (aref token 0) nil))
 
-(defun delphi-set-token-kind (token to-kind)
+(defun opascal-set-token-kind (token to-kind)
   ;; Sets the kind symbol of the token.
   (if token (aset token 0 to-kind)))
 
-(defsubst delphi-token-start (token)
+(defsubst opascal-token-start (token)
   ;; Returns the start point of the token.
   (if token (aref token 1) (point-min)))
 
-(defsubst delphi-token-end (token)
+(defsubst opascal-token-end (token)
   ;; Returns the end point of the token.
   (if token (aref token 2) (point-min)))
 
-(defun delphi-set-token-start (token start)
+(defun opascal-set-token-start (token start)
   ;; Sets the start point of the token.
   (if token (aset token 1 start)))
 
-(defun delphi-set-token-end (token end)
+(defun opascal-set-token-end (token end)
   ;; Sets the end point of the token.
   (if token (aset token 2 end)))
 
-(defun delphi-token-string (token)
+(defun opascal-token-string (token)
   ;; Returns the string image of the token.
   (if token
-      (delphi-string-of (delphi-token-start token) (delphi-token-end token))
+      (opascal-string-of (opascal-token-start token) (opascal-token-end token))
     ""))
 
-(defun delphi-in-token (p token)
+(defun opascal-in-token (p token)
   ;; Returns true if the point p is within the token's start/end points.
-  (and (<= (delphi-token-start token) p) (< p (delphi-token-end token))))
+  (and (<= (opascal-token-start token) p) (< p (opascal-token-end token))))
 
-(defun delphi-column-of (p)
+(defun opascal-column-of (p)
   ;; Returns the column of the point p.
   (save-excursion (goto-char p) (current-column)))
 
-(defvar delphi-progress-last-reported-point nil
+(defvar opascal-progress-last-reported-point nil
   "The last point at which progress was reported.")
 
-(defconst delphi-parsing-progress-step 16384
+(defconst opascal-parsing-progress-step 16384
   "Number of chars to process before the next parsing progress report.")
-(defconst delphi-scanning-progress-step 2048
+(defconst opascal-scanning-progress-step 2048
   "Number of chars to process before the next scanning progress report.")
 
-(defun delphi-progress-start ()
+(defun opascal-progress-start ()
   ;; Initializes progress reporting.
-  (setq delphi-progress-last-reported-point nil))
+  (setq opascal-progress-last-reported-point nil))
 
-(defun delphi-progress-done (&rest msgs)
+(defun opascal-progress-done (&rest msgs)
   ;; Finalizes progress reporting.
-  (setq delphi-progress-last-reported-point nil)
-  (when delphi-verbose
+  (setq opascal-progress-last-reported-point nil)
+  (when opascal-verbose
      (if (null msgs)
          (message "")
        (apply #'message msgs))))
 
-(defun delphi-step-progress (p desc step-size)
+(defun opascal-step-progress (p desc step-size)
   ;; If enough distance has elapsed since the last reported point, then report
   ;; the current progress to the user.
-  (cond ((null delphi-progress-last-reported-point)
+  (cond ((null opascal-progress-last-reported-point)
          ;; This is the first progress step.
-         (setq delphi-progress-last-reported-point p))
+         (setq opascal-progress-last-reported-point p))
 
-        ((and delphi-verbose
-              (>= (abs (- p delphi-progress-last-reported-point)) step-size))
+        ((and opascal-verbose
+              (>= (abs (- p opascal-progress-last-reported-point)) step-size))
          ;; Report the percentage complete.
-         (setq delphi-progress-last-reported-point p)
+         (setq opascal-progress-last-reported-point p)
          (message "%s %s ... %d%%"
                   desc (buffer-name) (/ (* 100 p) (point-max))))))
 
-(defun delphi-next-line-start (&optional from-point)
+(defun opascal-next-line-start (&optional from-point)
   ;; Returns the first point of the next line.
   (let ((curr-point (point))
         (next nil))
@@ -380,9 +380,9 @@ routine.")
     (goto-char curr-point)
     next))
 
-(defconst delphi--literal-start-re (regexp-opt '("//" "{" "(*" "'" "\"")))
+(defconst opascal--literal-start-re (regexp-opt '("//" "{" "(*" "'" "\"")))
 
-(defun delphi-literal-kind (p)
+(defun opascal-literal-kind (p)
   ;; Returns the literal kind the point p is in (or nil if not in a literal).
   (when (and (<= (point-min) p) (<= p (point-max)))
     (save-excursion
@@ -390,7 +390,7 @@ routine.")
         ;; We want to return non-nil when right in front
         ;; of a comment/string.
         (if (null (nth 8 ppss))
-            (when (looking-at delphi--literal-start-re)
+            (when (looking-at opascal--literal-start-re)
               (pcase (char-after)
                 (`?/  'comment-single-line)
                 (`?\{ 'comment-multi-line-1)
@@ -405,7 +405,7 @@ routine.")
               (`1 'comment-multi-line-2)
               (_  'comment-multi-line-1))))))))
 
-(defun delphi-literal-start-pattern (literal-kind)
+(defun opascal-literal-start-pattern (literal-kind)
   ;; Returns the start pattern of the literal kind.
   (cdr (assoc literal-kind
               '((comment-single-line . "//")
@@ -414,7 +414,7 @@ routine.")
                 (string . "'")
                 (double-quoted-string . "\"")))))
 
-(defun delphi-literal-end-pattern (literal-kind)
+(defun opascal-literal-end-pattern (literal-kind)
   ;; Returns the end pattern of the literal kind.
   (cdr (assoc literal-kind
               '((comment-single-line . "\n")
@@ -423,7 +423,7 @@ routine.")
                 (string . "'")
                 (double-quoted-string . "\"")))))
 
-(defun delphi-literal-stop-pattern (literal-kind)
+(defun opascal-literal-stop-pattern (literal-kind)
   ;; Returns the pattern that delimits end of the search for the literal kind.
   ;; These are regular expressions.
   (cdr (assoc literal-kind
@@ -434,17 +434,17 @@ routine.")
                 (string . "['\n]")
                 (double-quoted-string . "[\"\n]")))))
 
-(defun delphi-is-literal-end (p)
+(defun opascal-is-literal-end (p)
   ;; True if the point p is at the end point of a (completed) literal.
   (save-excursion
     (and (null (nth 8 (syntax-ppss p)))
          (nth 8 (syntax-ppss (1- p))))))
 
-(defun delphi-literal-token-at (p)
+(defun opascal-literal-token-at (p)
   "Return the literal token surrounding the point P, or nil if none."
   (save-excursion
     (let ((ppss (syntax-ppss p)))
-      (when (or (nth 8 ppss) (looking-at delphi--literal-start-re))
+      (when (or (nth 8 ppss) (looking-at opascal--literal-start-re))
         (let* ((new-start (or (nth 8 ppss) p))
                (new-end (progn
                           (goto-char new-start)
@@ -454,19 +454,19 @@ routine.")
                                 (forward-comment 1))
                             (scan-error (goto-char (point-max))))
                           (point))))
-          (delphi-token-of (delphi-literal-kind p) new-start new-end))))))
+          (opascal-token-of (opascal-literal-kind p) new-start new-end))))))
 
-(defun delphi-point-token-at (p kind)
+(defun opascal-point-token-at (p kind)
   ;; Returns the single character token at the point p.
-  (delphi-token-of kind p (1+ p)))
+  (opascal-token-of kind p (1+ p)))
 
-(defsubst delphi-char-token-at (p char kind)
+(defsubst opascal-char-token-at (p char kind)
   ;; Returns the token at the point p that describes the specified character.
   ;; If not actually over such a character, nil is returned.
   (when (eq char (char-after p))
-    (delphi-token-of kind p (1+ p))))
+    (opascal-token-of kind p (1+ p))))
 
-(defun delphi-charset-token-at (p charset kind)
+(defun opascal-charset-token-at (p charset kind)
   ;; Returns the token surrounding point p that contains only members of the
   ;; character set.
   (let ((currp (point))
@@ -477,244 +477,244 @@ routine.")
        (setq end (point))
        (goto-char (1+ p))
        (skip-chars-backward charset)
-       (setq token (delphi-token-of kind (point) end)))
+       (setq token (opascal-token-of kind (point) end)))
     (goto-char currp)
     token))
 
-(defun delphi-space-token-at (p)
+(defun opascal-space-token-at (p)
   ;; If point p is surrounded by space characters, then return the token of the
   ;; contiguous spaces.
-  (delphi-charset-token-at p delphi-space-chars 'space))
+  (opascal-charset-token-at p opascal-space-chars 'space))
 
-(defun delphi-word-token-at (p)
+(defun opascal-word-token-at (p)
   ;; If point p is over a word (i.e. identifier characters), then return a word
   ;; token. If the word is actually a keyword, then return the keyword token.
-  (let ((word (delphi-charset-token-at p delphi-word-chars 'word)))
+  (let ((word (opascal-charset-token-at p opascal-word-chars 'word)))
     (when word
-      (let* ((word-image (downcase (delphi-token-string word)))
+      (let* ((word-image (downcase (opascal-token-string word)))
              (keyword (intern-soft word-image)))
         (when (and (or keyword (string= "nil" word-image))
-                   (delphi-is keyword delphi-keywords))
-          (delphi-set-token-kind word keyword))
+                   (opascal-is keyword opascal-keywords))
+          (opascal-set-token-kind word keyword))
         word))))
 
-(defun delphi-explicit-token-at (p token-string kind)
+(defun opascal-explicit-token-at (p token-string kind)
   ;; If point p is anywhere in the token string then returns the resulting
   ;; token.
-  (let ((token (delphi-charset-token-at p token-string kind)))
-    (when (and token (string= token-string (delphi-token-string token)))
+  (let ((token (opascal-charset-token-at p token-string kind)))
+    (when (and token (string= token-string (opascal-token-string token)))
        token)))
 
-(defun delphi-token-at (p)
+(defun opascal-token-at (p)
   ;; Returns the token from parsing text at point p.
   (when (and (<= (point-min) p) (<= p (point-max)))
-     (cond ((delphi-char-token-at p ?\n 'newline))
+     (cond ((opascal-char-token-at p ?\n 'newline))
 
-           ((delphi-literal-token-at p))
+           ((opascal-literal-token-at p))
 
-           ((delphi-space-token-at p))
+           ((opascal-space-token-at p))
 
-           ((delphi-word-token-at p))
+           ((opascal-word-token-at p))
 
-           ((delphi-char-token-at p ?\( 'open-group))
-           ((delphi-char-token-at p ?\) 'close-group))
-           ((delphi-char-token-at p ?\[ 'open-group))
-           ((delphi-char-token-at p ?\] 'close-group))
-           ((delphi-char-token-at p ?\; 'semicolon))
-           ((delphi-char-token-at p ?. 'dot))
-           ((delphi-char-token-at p ?, 'comma))
-           ((delphi-char-token-at p ?= 'equals))
-           ((delphi-char-token-at p ?+ 'plus))
-           ((delphi-char-token-at p ?- 'minus))
-           ((delphi-char-token-at p ?* 'times))
-           ((delphi-char-token-at p ?/ 'divides))
-           ((delphi-char-token-at p ?: 'colon))
+           ((opascal-char-token-at p ?\( 'open-group))
+           ((opascal-char-token-at p ?\) 'close-group))
+           ((opascal-char-token-at p ?\[ 'open-group))
+           ((opascal-char-token-at p ?\] 'close-group))
+           ((opascal-char-token-at p ?\; 'semicolon))
+           ((opascal-char-token-at p ?. 'dot))
+           ((opascal-char-token-at p ?, 'comma))
+           ((opascal-char-token-at p ?= 'equals))
+           ((opascal-char-token-at p ?+ 'plus))
+           ((opascal-char-token-at p ?- 'minus))
+           ((opascal-char-token-at p ?* 'times))
+           ((opascal-char-token-at p ?/ 'divides))
+           ((opascal-char-token-at p ?: 'colon))
 
-           ((delphi-explicit-token-at p "<>" 'not-equals))
+           ((opascal-explicit-token-at p "<>" 'not-equals))
 
-           ((delphi-point-token-at p 'punctuation)))))
+           ((opascal-point-token-at p 'punctuation)))))
 
-(defun delphi-current-token ()
-  ;; Returns the delphi source token under the current point.
-  (delphi-token-at (point)))
+(defun opascal-current-token ()
+  ;; Returns the opascal source token under the current point.
+  (opascal-token-at (point)))
 
-(defun delphi-next-token (token)
+(defun opascal-next-token (token)
   ;; Returns the token after the specified token.
   (when token
-     (let ((next (delphi-token-at (delphi-token-end token))))
+     (let ((next (opascal-token-at (opascal-token-end token))))
        (if next
-           (delphi-step-progress (delphi-token-start next) "Scanning"
-                                 delphi-scanning-progress-step))
+           (opascal-step-progress (opascal-token-start next) "Scanning"
+                                 opascal-scanning-progress-step))
        next)))
 
-(defun delphi-previous-token (token)
+(defun opascal-previous-token (token)
   ;; Returns the token before the specified token.
   (when token
-     (let ((previous (delphi-token-at (1- (delphi-token-start token)))))
+     (let ((previous (opascal-token-at (1- (opascal-token-start token)))))
        (if previous
-           (delphi-step-progress (delphi-token-start previous) "Scanning"
-                                 delphi-scanning-progress-step))
+           (opascal-step-progress (opascal-token-start previous) "Scanning"
+                                 opascal-scanning-progress-step))
        previous)))
 
-(defun delphi-next-visible-token (token)
+(defun opascal-next-visible-token (token)
   ;; Returns the first non-space token after the specified token.
   (let (next-token)
     (while (progn
-             (setq next-token (delphi-next-token token))
-             (delphi-is (delphi-token-kind next-token) '(space newline))))
+             (setq next-token (opascal-next-token token))
+             (opascal-is (opascal-token-kind next-token) '(space newline))))
     next-token))
 
-(defun delphi-group-start (from-token)
+(defun opascal-group-start (from-token)
   ;; Returns the token that denotes the start of the ()/[] group.
-  (let ((token (delphi-previous-token from-token))
+  (let ((token (opascal-previous-token from-token))
         (token-kind nil))
     (catch 'done
       (while token
-        (setq token-kind (delphi-token-kind token))
+        (setq token-kind (opascal-token-kind token))
         (cond
          ;; Skip over nested groups.
-         ((eq 'close-group token-kind) (setq token (delphi-group-start token)))
+         ((eq 'close-group token-kind) (setq token (opascal-group-start token)))
          ((eq 'open-group token-kind) (throw 'done token)))
-        (setq token (delphi-previous-token token)))
+        (setq token (opascal-previous-token token)))
       ;; Start not found.
       nil)))
 
-(defun delphi-group-end (from-token)
+(defun opascal-group-end (from-token)
   ;; Returns the token that denotes the end of the ()/[] group.
-  (let ((token (delphi-next-token from-token))
+  (let ((token (opascal-next-token from-token))
         (token-kind nil))
     (catch 'done
       (while token
-        (setq token-kind (delphi-token-kind token))
+        (setq token-kind (opascal-token-kind token))
         (cond
          ;; Skip over nested groups.
-         ((eq 'open-group token-kind) (setq token (delphi-group-end token)))
+         ((eq 'open-group token-kind) (setq token (opascal-group-end token)))
          ((eq 'close-group token-kind) (throw 'done token)))
-        (setq token (delphi-next-token token)))
+        (setq token (opascal-next-token token)))
       ;; end not found.
       nil)))
 
-(defun delphi-indent-of (token &optional offset)
+(defun opascal-indent-of (token &optional offset)
   ;; Returns the start column of the token, plus any offset.
-  (let ((indent (+ (delphi-column-of (delphi-token-start token))
+  (let ((indent (+ (opascal-column-of (opascal-token-start token))
                    (if offset offset 0))))
-    (when delphi-debug
-      (delphi-debug-log
+    (when opascal-debug
+      (opascal-debug-log
        (concat "\n Indent of: %S %S"
                "\n column: %d indent: %d offset: %d")
-       token (delphi-token-string token)
-       (delphi-column-of (delphi-token-start token))
+       token (opascal-token-string token)
+       (opascal-column-of (opascal-token-start token))
        indent (if offset offset 0)))
     indent))
 
-(defun delphi-line-indent-of (from-token &optional offset &rest terminators)
+(defun opascal-line-indent-of (from-token &optional offset &rest terminators)
   ;; Returns the column of first non-space character on the token's line, plus
   ;; any offset. We also stop if one of the terminators or an open ( or [ is
   ;; encountered.
-  (let ((token (delphi-previous-token from-token))
+  (let ((token (opascal-previous-token from-token))
         (last-token from-token)
         (kind nil))
     (catch 'done
       (while token
-        (setq kind (delphi-token-kind token))
+        (setq kind (opascal-token-kind token))
         (cond
          ;; Skip over ()/[] groups.
-         ((eq 'close-group kind) (setq token (delphi-group-start token)))
+         ((eq 'close-group kind) (setq token (opascal-group-start token)))
 
          ;; Stop at the beginning of the line or an open group.
-         ((delphi-is kind '(newline open-group)) (throw 'done nil))
+         ((opascal-is kind '(newline open-group)) (throw 'done nil))
 
          ;; Stop at one of the specified terminators.
-         ((delphi-is kind terminators) (throw 'done nil)))
-        (unless (delphi-is kind delphi-whitespace) (setq last-token token))
-        (setq token (delphi-previous-token token))))
-    (delphi-indent-of last-token offset)))
+         ((opascal-is kind terminators) (throw 'done nil)))
+        (unless (opascal-is kind opascal-whitespace) (setq last-token token))
+        (setq token (opascal-previous-token token))))
+    (opascal-indent-of last-token offset)))
 
-(defun delphi-stmt-line-indent-of (from-token &optional offset)
-  ;; Like `delphi-line-indent-of' except is also stops on a use clause, and
+(defun opascal-stmt-line-indent-of (from-token &optional offset)
+  ;; Like `opascal-line-indent-of' except is also stops on a use clause, and
   ;; colons that precede statements (i.e. case labels).
-  (let ((token (delphi-previous-token from-token))
+  (let ((token (opascal-previous-token from-token))
         (last-token from-token)
         (kind nil))
     (catch 'done
       (while token
-        (setq kind (delphi-token-kind token))
+        (setq kind (opascal-token-kind token))
         (cond
          ((and (eq 'colon kind)
-               (delphi-is (delphi-token-kind last-token)
-                          `(,@delphi-block-statements
-                            ,@delphi-expr-statements)))
+               (opascal-is (opascal-token-kind last-token)
+                          `(,@opascal-block-statements
+                            ,@opascal-expr-statements)))
           ;; We hit a label followed by a statement. Indent to the statement.
           (throw 'done nil))
 
          ;; Skip over ()/[] groups.
-         ((eq 'close-group kind) (setq token (delphi-group-start token)))
+         ((eq 'close-group kind) (setq token (opascal-group-start token)))
 
-         ((delphi-is kind `(newline open-group ,@delphi-use-clauses))
+         ((opascal-is kind `(newline open-group ,@opascal-use-clauses))
           ;; Stop at the beginning of the line, an open group, or a use clause
           (throw 'done nil)))
-        (unless (delphi-is kind delphi-whitespace) (setq last-token token))
-        (setq token (delphi-previous-token token))))
-    (delphi-indent-of last-token offset)))
+        (unless (opascal-is kind opascal-whitespace) (setq last-token token))
+        (setq token (opascal-previous-token token))))
+    (opascal-indent-of last-token offset)))
 
-(defun delphi-open-group-indent (token last-token &optional offset)
+(defun opascal-open-group-indent (token last-token &optional offset)
   ;; Returns the indent relative to an unmatched ( or [.
-  (when (eq 'open-group (delphi-token-kind token))
+  (when (eq 'open-group (opascal-token-kind token))
     (if last-token
-        (delphi-indent-of last-token offset)
+        (opascal-indent-of last-token offset)
       ;; There is nothing following the ( or [. Indent from its line.
-      (delphi-stmt-line-indent-of token delphi-indent-level))))
+      (opascal-stmt-line-indent-of token opascal-indent-level))))
 
-(defun delphi-composite-type-start (token last-token)
+(defun opascal-composite-type-start (token last-token)
   ;; Returns true (actually the last-token) if the pair equals (= class), (=
   ;; dispinterface), (= interface), (= object), or (= record), and nil
   ;; otherwise.
-  (if (and (eq 'equals (delphi-token-kind token))
-           (delphi-is (delphi-token-kind last-token) delphi-composite-types))
+  (if (and (eq 'equals (opascal-token-kind token))
+           (opascal-is (opascal-token-kind last-token) opascal-composite-types))
       last-token))
 
-(defun delphi-is-simple-class-type (at-token limit-token)
+(defun opascal-is-simple-class-type (at-token limit-token)
   ;; True if at-token is the start of a simple class type. E.g.
   ;;   class of TClass;
   ;;   class (TBaseClass);
   ;;   class;
-  (when (delphi-is (delphi-token-kind at-token) delphi-class-types)
+  (when (opascal-is (opascal-token-kind at-token) opascal-class-types)
     (catch 'done
       ;; Scan until the semi colon.
-      (let ((token (delphi-next-token at-token))
+      (let ((token (opascal-next-token at-token))
             (token-kind nil)
-            (limit (delphi-token-start limit-token)))
-        (while (and token (<= (delphi-token-start token) limit))
-          (setq token-kind (delphi-token-kind token))
+            (limit (opascal-token-start limit-token)))
+        (while (and token (<= (opascal-token-start token) limit))
+          (setq token-kind (opascal-token-kind token))
           (cond
            ;; A semicolon delimits the search.
            ((eq 'semicolon token-kind) (throw 'done token))
 
            ;; Skip over the inheritance list.
-           ((eq 'open-group token-kind) (setq token (delphi-group-end token)))
+           ((eq 'open-group token-kind) (setq token (opascal-group-end token)))
 
            ;; Only allow "of" and whitespace, and an identifier
-           ((delphi-is token-kind `(of word ,@delphi-whitespace)))
+           ((opascal-is token-kind `(of word ,@opascal-whitespace)))
 
            ;; Otherwise we are not in a simple class declaration.
            ((throw 'done nil)))
-          (setq token (delphi-next-token token)))))))
+          (setq token (opascal-next-token token)))))))
 
-(defun delphi-block-start (from-token &optional stop-on-class)
+(defun opascal-block-start (from-token &optional stop-on-class)
   ;; Returns the token that denotes the start of the block.
-  (let ((token (delphi-previous-token from-token))
+  (let ((token (opascal-previous-token from-token))
         (last-token nil)
         (token-kind nil))
     (catch 'done
       (while token
-        (setq token-kind (delphi-token-kind token))
+        (setq token-kind (opascal-token-kind token))
         (cond
          ;; Skip over nested blocks.
-         ((delphi-is token-kind delphi-end-block-statements)
-          (setq token (delphi-block-start token)))
+         ((opascal-is token-kind opascal-end-block-statements)
+          (setq token (opascal-block-start token)))
 
          ;; Regular block start found.
-         ((delphi-is token-kind delphi-block-statements)
+         ((opascal-is token-kind opascal-block-statements)
           (throw 'done
                  ;; As a special case, when a "case" block appears
                  ;; within a record declaration (to denote a variant
@@ -722,42 +722,42 @@ routine.")
                  ;; the enclosing block.
                  (if (eq 'case token-kind)
                      (let ((enclosing-token
-                            (delphi-block-start token
+                            (opascal-block-start token
                                                 'stop-on-class)))
                        (if
                            (eq 'record
-                               (delphi-token-kind enclosing-token))
+                               (opascal-token-kind enclosing-token))
                            (if stop-on-class
                                enclosing-token
-                             (delphi-previous-token enclosing-token))
+                             (opascal-previous-token enclosing-token))
                          token))
                    token)))
 
          ;; A class/record start also begins a block.
-         ((delphi-composite-type-start token last-token)
+         ((opascal-composite-type-start token last-token)
           (throw 'done (if stop-on-class last-token token)))
          )
-        (unless (delphi-is token-kind delphi-whitespace)
+        (unless (opascal-is token-kind opascal-whitespace)
           (setq last-token token))
-        (setq token (delphi-previous-token token)))
+        (setq token (opascal-previous-token token)))
       ;; Start not found.
       nil)))
 
-(defun delphi-else-start (from-else)
+(defun opascal-else-start (from-else)
   ;; Returns the token of the if or case statement.
-  (let ((token (delphi-previous-token from-else))
+  (let ((token (opascal-previous-token from-else))
         (token-kind nil)
         (semicolon-count 0))
     (catch 'done
       (while token
-        (setq token-kind (delphi-token-kind token))
+        (setq token-kind (opascal-token-kind token))
         (cond
          ;; Skip over nested groups.
-         ((eq 'close-group token-kind) (setq token (delphi-group-start token)))
+         ((eq 'close-group token-kind) (setq token (opascal-group-start token)))
 
          ;; Skip over any nested blocks.
-         ((delphi-is token-kind delphi-end-block-statements)
-          (setq token (delphi-block-start token)))
+         ((opascal-is token-kind opascal-end-block-statements)
+          (setq token (opascal-block-start token)))
 
          ((eq 'semicolon token-kind)
           ;; Semicolon means we are looking for an enclosing if, unless we
@@ -773,151 +773,151 @@ routine.")
          ((eq 'case token-kind)
           ;; We have hit a case statement start.
           (throw 'done token)))
-        (setq token (delphi-previous-token token)))
+        (setq token (opascal-previous-token token)))
       ;; No if or case statement found.
       nil)))
 
-(defun delphi-comment-content-start (comment)
+(defun opascal-comment-content-start (comment)
   ;; Returns the point of the first non-space character in the comment.
-  (let ((kind (delphi-token-kind comment)))
-    (when (delphi-is kind delphi-comments)
-      (delphi-save-excursion
-       (goto-char (+ (delphi-token-start comment)
-                     (length (delphi-literal-start-pattern kind))))
-       (skip-chars-forward delphi-space-chars)
+  (let ((kind (opascal-token-kind comment)))
+    (when (opascal-is kind opascal-comments)
+      (opascal-save-excursion
+       (goto-char (+ (opascal-token-start comment)
+                     (length (opascal-literal-start-pattern kind))))
+       (skip-chars-forward opascal-space-chars)
        (point)))))
 
-(defun delphi-comment-block-start (comment)
+(defun opascal-comment-block-start (comment)
   ;; Returns the starting comment token of a contiguous // comment block. If
   ;; the comment is multiline (i.e. {...} or (*...*)), the original comment is
   ;; returned.
-  (if (not (eq 'comment-single-line (delphi-token-kind comment)))
+  (if (not (eq 'comment-single-line (opascal-token-kind comment)))
       comment
     ;; Scan until we run out of // comments.
     (let ((prev-comment comment)
           (start-comment comment))
-      (while (let ((kind (delphi-token-kind prev-comment)))
+      (while (let ((kind (opascal-token-kind prev-comment)))
                (cond ((eq kind 'space))
                      ((eq kind 'comment-single-line)
                       (setq start-comment prev-comment))
                      (t nil)))
-        (setq prev-comment (delphi-previous-token prev-comment)))
+        (setq prev-comment (opascal-previous-token prev-comment)))
       start-comment)))
 
-(defun delphi-comment-block-end (comment)
+(defun opascal-comment-block-end (comment)
   ;; Returns the end comment token of a contiguous // comment block. If the
   ;; comment is multiline (i.e. {...} or (*...*)), the original comment is
   ;; returned.
-  (if (not (eq 'comment-single-line (delphi-token-kind comment)))
+  (if (not (eq 'comment-single-line (opascal-token-kind comment)))
       comment
     ;; Scan until we run out of // comments.
     (let ((next-comment comment)
           (end-comment comment))
-      (while (let ((kind (delphi-token-kind next-comment)))
+      (while (let ((kind (opascal-token-kind next-comment)))
                (cond ((eq kind 'space))
                      ((eq kind 'comment-single-line)
                       (setq end-comment next-comment))
                      (t nil)))
-        (setq next-comment (delphi-next-token next-comment)))
+        (setq next-comment (opascal-next-token next-comment)))
       end-comment)))
 
-(defun delphi-on-first-comment-line (comment)
+(defun opascal-on-first-comment-line (comment)
   ;; Returns true if the current point is on the first line of the comment.
   (save-excursion
-    (let ((comment-start (delphi-token-start comment))
+    (let ((comment-start (opascal-token-start comment))
           (current-point (point)))
       (goto-char comment-start)
       (end-of-line)
       (and (<= comment-start current-point) (<= current-point (point))))))
 
-(defun delphi-comment-indent-of (comment)
+(defun opascal-comment-indent-of (comment)
   ;; Returns the correct indentation for the comment.
-  (let ((start-comment (delphi-comment-block-start comment)))
+  (let ((start-comment (opascal-comment-block-start comment)))
     (if (and (eq start-comment comment)
-             (delphi-on-first-comment-line comment))
+             (opascal-on-first-comment-line comment))
         ;; Indent as a statement.
-        (delphi-enclosing-indent-of comment)
+        (opascal-enclosing-indent-of comment)
       (save-excursion
-        (let ((kind (delphi-token-kind comment)))
+        (let ((kind (opascal-token-kind comment)))
           (beginning-of-line)
           (cond ((eq 'comment-single-line kind)
                  ;; Indent to the first comment in the // block.
-                 (delphi-indent-of start-comment))
+                 (opascal-indent-of start-comment))
 
-                ((looking-at (concat delphi-leading-spaces-re
-                                     (delphi-literal-stop-pattern kind)))
+                ((looking-at (concat opascal-leading-spaces-re
+                                     (opascal-literal-stop-pattern kind)))
                  ;; Indent multi-line comment terminators to the comment start.
-                 (delphi-indent-of comment))
+                 (opascal-indent-of comment))
 
                 ;; Indent according to the comment's content start.
-                ((delphi-column-of (delphi-comment-content-start comment)))))))
+                ((opascal-column-of (opascal-comment-content-start comment)))))))
     ))
 
-(defun delphi-is-use-clause-end (at-token last-token last-colon from-kind)
+(defun opascal-is-use-clause-end (at-token last-token last-colon from-kind)
   ;; True if we are after the end of a uses type clause.
   (when (and last-token
              (not last-colon)
-             (eq 'comma (delphi-token-kind at-token))
+             (eq 'comma (opascal-token-kind at-token))
              (eq 'semicolon from-kind))
     ;; Scan for the uses statement, just to be sure.
-    (let ((token (delphi-previous-token at-token))
+    (let ((token (opascal-previous-token at-token))
           (token-kind nil))
       (catch 'done
         (while token
-          (setq token-kind (delphi-token-kind token))
-          (cond ((delphi-is token-kind delphi-use-clauses)
+          (setq token-kind (opascal-token-kind token))
+          (cond ((opascal-is token-kind opascal-use-clauses)
                  (throw 'done t))
 
                 ;; Whitespace, identifiers, strings, "in" keyword, and commas
                 ;; are allowed in use clauses.
-                ((or (delphi-is token-kind '(word comma in newline))
-                     (delphi-is token-kind delphi-whitespace)
-                     (delphi-is token-kind delphi-strings)))
+                ((or (opascal-is token-kind '(word comma in newline))
+                     (opascal-is token-kind opascal-whitespace)
+                     (opascal-is token-kind opascal-strings)))
 
                 ;; Nothing else is.
                 ((throw 'done nil)))
-          (setq token (delphi-previous-token token)))
+          (setq token (opascal-previous-token token)))
         nil))))
 
-(defun delphi-is-block-after-expr-statement (token)
+(defun opascal-is-block-after-expr-statement (token)
   ;; Returns true if we have a block token trailing an expression delimiter (of
   ;; presumably an expression statement).
-  (when (delphi-is (delphi-token-kind token) delphi-block-statements)
-    (let ((previous (delphi-previous-token token))
+  (when (opascal-is (opascal-token-kind token) opascal-block-statements)
+    (let ((previous (opascal-previous-token token))
           (previous-kind nil))
       (while (progn
-               (setq previous-kind (delphi-token-kind previous))
+               (setq previous-kind (opascal-token-kind previous))
                (eq previous-kind 'space))
-        (setq previous (delphi-previous-token previous)))
-      (or (delphi-is previous-kind delphi-expr-delimiters)
+        (setq previous (opascal-previous-token previous)))
+      (or (opascal-is previous-kind opascal-expr-delimiters)
           (eq previous-kind 'else)))))
 
-(defun delphi-previous-indent-of (from-token)
+(defun opascal-previous-indent-of (from-token)
   ;; Returns the indentation of the previous statement of the token.
-  (let ((token (delphi-previous-token from-token))
+  (let ((token (opascal-previous-token from-token))
         (token-kind nil)
-        (from-kind (delphi-token-kind from-token))
+        (from-kind (opascal-token-kind from-token))
         (last-colon nil)
         (last-of nil)
         (last-token nil))
     (catch 'done
       (while token
-        (setq token-kind (delphi-token-kind token))
+        (setq token-kind (opascal-token-kind token))
         (cond
          ;; An open ( or [ always is an indent point.
          ((eq 'open-group token-kind)
-          (throw 'done (delphi-open-group-indent token last-token)))
+          (throw 'done (opascal-open-group-indent token last-token)))
 
          ;; Skip over any ()/[] groups.
-         ((eq 'close-group token-kind) (setq token (delphi-group-start token)))
+         ((eq 'close-group token-kind) (setq token (opascal-group-start token)))
 
-         ((delphi-is token-kind delphi-end-block-statements)
-          (if (eq 'newline (delphi-token-kind (delphi-previous-token token)))
+         ((opascal-is token-kind opascal-end-block-statements)
+          (if (eq 'newline (opascal-token-kind (opascal-previous-token token)))
               ;; We can stop at an end token that is right up against the
               ;; margin.
               (throw 'done 0)
             ;; Otherwise, skip over any nested blocks.
-            (setq token (delphi-block-start token))))
+            (setq token (opascal-block-start token))))
 
          ;; Special case: if we encounter a ", word;" then we assume that we
          ;; are in some kind of uses clause, and thus indent to column 0. This
@@ -928,19 +928,19 @@ routine.")
          ;;      someUnit,
          ;;      someOtherUnit;
          ;;      // this should be at column 0!
-         ((delphi-is-use-clause-end token last-token last-colon from-kind)
+         ((opascal-is-use-clause-end token last-token last-colon from-kind)
           (throw 'done 0))
 
          ;; A previous terminator means we can stop. If we are on a directive,
          ;; however, then we are not actually encountering a new statement.
          ((and last-token
-               (delphi-is token-kind delphi-previous-terminators)
-               (not (delphi-is (delphi-token-kind last-token)
-                               delphi-directives)))
-          (throw 'done (delphi-stmt-line-indent-of last-token 0)))
+               (opascal-is token-kind opascal-previous-terminators)
+               (not (opascal-is (opascal-token-kind last-token)
+                               opascal-directives)))
+          (throw 'done (opascal-stmt-line-indent-of last-token 0)))
 
          ;; Ignore whitespace.
-         ((delphi-is token-kind delphi-whitespace))
+         ((opascal-is token-kind opascal-whitespace))
 
          ;; Remember any "of" we encounter, since that affects how we
          ;; indent to a case statement within a record declaration
@@ -958,61 +958,61 @@ routine.")
          ;; specially.
          ((eq 'case token-kind)
           (throw 'done
-                (if last-colon (delphi-line-indent-of last-colon)
-                  (delphi-line-indent-of token delphi-case-label-indent))))
+                (if last-colon (opascal-line-indent-of last-colon)
+                  (opascal-line-indent-of token opascal-case-label-indent))))
 
          ;; If we are in a use clause then commas mark an enclosing rather than
          ;; a previous statement.
-         ((delphi-is token-kind delphi-use-clauses)
+         ((opascal-is token-kind opascal-use-clauses)
           (throw 'done
                  (if (eq 'comma from-kind)
                      (if last-token
                          ;; Indent to first unit in use clause.
-                         (delphi-indent-of last-token)
+                         (opascal-indent-of last-token)
                        ;; Indent from use clause keyword.
-                       (delphi-line-indent-of token delphi-indent-level))
+                       (opascal-line-indent-of token opascal-indent-level))
                    ;; Indent to use clause keyword.
-                   (delphi-line-indent-of token))))
+                   (opascal-line-indent-of token))))
 
          ;; Assembly sections always indent in from the asm keyword.
          ((eq token-kind 'asm)
-          (throw 'done (delphi-stmt-line-indent-of token delphi-indent-level)))
+          (throw 'done (opascal-stmt-line-indent-of token opascal-indent-level)))
 
          ;; An enclosing statement delimits a previous statement.
          ;; We try to use the existing indent of the previous statement,
          ;; otherwise we calculate from the enclosing statement.
-         ((delphi-is token-kind delphi-previous-enclosing-statements)
+         ((opascal-is token-kind opascal-previous-enclosing-statements)
           (throw 'done (if last-token
                            ;; Otherwise indent to the last token
-                           (delphi-line-indent-of last-token)
+                           (opascal-line-indent-of last-token)
                          ;; Just indent from the enclosing keyword
-                         (delphi-line-indent-of token delphi-indent-level))))
+                         (opascal-line-indent-of token opascal-indent-level))))
 
          ;; A class or record declaration also delimits a previous statement.
-         ((delphi-composite-type-start token last-token)
+         ((opascal-composite-type-start token last-token)
           (throw
            'done
-           (if (delphi-is-simple-class-type last-token from-token)
+           (if (opascal-is-simple-class-type last-token from-token)
                ;; c = class; or c = class of T; are previous statements.
-               (delphi-line-indent-of token)
+               (opascal-line-indent-of token)
              ;; Otherwise c = class ... or r = record ... are enclosing
              ;; statements.
-             (delphi-line-indent-of last-token delphi-indent-level))))
+             (opascal-line-indent-of last-token opascal-indent-level))))
 
          ;; We have a definite previous statement delimiter.
-         ((delphi-is token-kind delphi-previous-statements)
-          (throw 'done (delphi-stmt-line-indent-of token 0)))
+         ((opascal-is token-kind opascal-previous-statements)
+          (throw 'done (opascal-stmt-line-indent-of token 0)))
          )
-        (unless (delphi-is token-kind delphi-whitespace)
+        (unless (opascal-is token-kind opascal-whitespace)
            (setq last-token token))
-        (setq token (delphi-previous-token token)))
+        (setq token (opascal-previous-token token)))
       ;; We ran out of tokens. Indent to column 0.
       0)))
 
-(defun delphi-section-indent-of (section-token)
+(defun opascal-section-indent-of (section-token)
   ;; Returns the indentation appropriate for begin/var/const/type/label
   ;; tokens.
-  (let* ((token (delphi-previous-token section-token))
+  (let* ((token (opascal-previous-token section-token))
          (token-kind nil)
          (last-token nil)
          (nested-block-count 0)
@@ -1020,22 +1020,22 @@ routine.")
          (last-terminator nil))
     (catch 'done
       (while token
-        (setq token-kind (delphi-token-kind token))
+        (setq token-kind (opascal-token-kind token))
         (cond
          ;; Always stop at unmatched ( or [.
          ((eq token-kind 'open-group)
-          (throw 'done (delphi-open-group-indent token last-token)))
+          (throw 'done (opascal-open-group-indent token last-token)))
 
          ;; Skip over any ()/[] groups.
-         ((eq 'close-group token-kind) (setq token (delphi-group-start token)))
+         ((eq 'close-group token-kind) (setq token (opascal-group-start token)))
 
-         ((delphi-is token-kind delphi-end-block-statements)
-          (if (eq 'newline (delphi-token-kind (delphi-previous-token token)))
+         ((opascal-is token-kind opascal-end-block-statements)
+          (if (eq 'newline (opascal-token-kind (opascal-previous-token token)))
               ;; We can stop at an end token that is right up against the
               ;; margin.
               (throw 'done 0)
             ;; Otherwise, skip over any nested blocks.
-            (setq token (delphi-block-start token)
+            (setq token (opascal-block-start token)
                   nested-block-count (1+ nested-block-count))))
 
          ;; Remember if we have encountered any forward routine declarations.
@@ -1043,7 +1043,7 @@ routine.")
           (setq nested-block-count (1+ nested-block-count)))
 
          ;; Mark the completion of a nested routine traversal.
-         ((and (delphi-is token-kind delphi-routine-statements)
+         ((and (opascal-is token-kind opascal-routine-statements)
                (> nested-block-count 0))
           (setq nested-block-count (1- nested-block-count)))
 
@@ -1051,50 +1051,50 @@ routine.")
          ((eq 'semicolon token-kind) (setq last-terminator token))
 
          ;; Remember if we have encountered any expression delimiters.
-         ((delphi-is token-kind delphi-expr-delimiters)
+         ((opascal-is token-kind opascal-expr-delimiters)
           (setq expr-delimited token))
 
          ;; Enclosing body statements are delimiting. We indent the compound
          ;; bodies specially.
          ((and (not last-terminator)
-               (delphi-is token-kind delphi-body-statements))
+               (opascal-is token-kind opascal-body-statements))
           (throw 'done
-           (delphi-stmt-line-indent-of token delphi-compound-block-indent)))
+           (opascal-stmt-line-indent-of token opascal-compound-block-indent)))
 
          ;; An enclosing ":" means a label.
          ((and (eq 'colon token-kind)
-               (delphi-is (delphi-token-kind section-token)
-                          delphi-block-statements)
+               (opascal-is (opascal-token-kind section-token)
+                          opascal-block-statements)
                (not last-terminator)
                (not expr-delimited)
-               (not (eq 'equals (delphi-token-kind last-token))))
+               (not (eq 'equals (opascal-token-kind last-token))))
           (throw 'done
-                 (delphi-stmt-line-indent-of token delphi-indent-level)))
+                 (opascal-stmt-line-indent-of token opascal-indent-level)))
 
          ;; Block and mid block tokens are always enclosing
-         ((delphi-is token-kind delphi-begin-enclosing-tokens)
+         ((opascal-is token-kind opascal-begin-enclosing-tokens)
           (throw 'done
-                 (delphi-stmt-line-indent-of token delphi-indent-level)))
+                 (opascal-stmt-line-indent-of token opascal-indent-level)))
 
          ;; Declaration sections and routines are delimiters, unless they
          ;; are part of a nested routine.
-         ((and (delphi-is token-kind delphi-decl-delimiters)
+         ((and (opascal-is token-kind opascal-decl-delimiters)
                (= 0 nested-block-count))
-          (throw 'done (delphi-line-indent-of token 0)))
+          (throw 'done (opascal-line-indent-of token 0)))
 
          ;; Unit statements mean we indent right to the left.
-         ((delphi-is token-kind delphi-unit-statements) (throw 'done 0))
+         ((opascal-is token-kind opascal-unit-statements) (throw 'done 0))
          )
-        (unless (delphi-is token-kind delphi-whitespace)
+        (unless (opascal-is token-kind opascal-whitespace)
            (setq last-token token))
-        (setq token (delphi-previous-token token)))
+        (setq token (opascal-previous-token token)))
       ;; We ran out of tokens. Indent to column 0.
       0)))
 
-(defun delphi-enclosing-indent-of (from-token)
+(defun opascal-enclosing-indent-of (from-token)
   ;; Returns the indentation offset from the enclosing statement of the token.
-  (let ((token (delphi-previous-token from-token))
-        (from-kind (delphi-token-kind from-token))
+  (let ((token (opascal-previous-token from-token))
+        (from-kind (opascal-token-kind from-token))
         (token-kind nil)
         (stmt-start nil)
         (last-token nil)
@@ -1103,51 +1103,51 @@ routine.")
         (expr-delimited nil))
     (catch 'done
       (while token
-        (setq token-kind (delphi-token-kind token))
+        (setq token-kind (opascal-token-kind token))
         (cond
          ;; An open ( or [ always is an indent point.
          ((eq 'open-group token-kind)
           (throw 'done
-                 (delphi-open-group-indent
+                 (opascal-open-group-indent
                   token last-token
-                  (if (delphi-is from-kind delphi-binary-ops)
+                  (if (opascal-is from-kind opascal-binary-ops)
                       ;; Keep binary operations aligned with the open group.
                       0
-                    delphi-indent-level))))
+                    opascal-indent-level))))
 
          ;; Skip over any ()/[] groups.
-         ((eq 'close-group token-kind) (setq token (delphi-group-start token)))
+         ((eq 'close-group token-kind) (setq token (opascal-group-start token)))
 
          ;; Skip over any nested blocks.
-         ((delphi-is token-kind delphi-end-block-statements)
-          (setq token (delphi-block-start token)))
+         ((opascal-is token-kind opascal-end-block-statements)
+          (setq token (opascal-block-start token)))
 
          ;; An expression delimiter affects indentation depending on whether
          ;; the point is before or after it. Remember that we encountered one.
          ;; Also remember the last encountered token, since if it exists it
          ;; should be the actual indent point.
-         ((delphi-is token-kind delphi-expr-delimiters)
+         ((opascal-is token-kind opascal-expr-delimiters)
           (setq expr-delimited token stmt-start last-token))
 
          ;; With a non-delimited expression statement we indent after the
          ;; statement's keyword, unless we are on the delimiter itself.
          ((and (not expr-delimited)
-               (delphi-is token-kind delphi-expr-statements))
+               (opascal-is token-kind opascal-expr-statements))
           (throw 'done
-             (cond ((delphi-is from-kind delphi-expr-delimiters)
+             (cond ((opascal-is from-kind opascal-expr-delimiters)
                     ;; We are indenting a delimiter. Indent to the statement.
-                    (delphi-stmt-line-indent-of token 0))
+                    (opascal-stmt-line-indent-of token 0))
 
-                   ((and last-token (delphi-is from-kind delphi-binary-ops))
+                   ((and last-token (opascal-is from-kind opascal-binary-ops))
                     ;; Align binary ops with the expression.
-                    (delphi-indent-of last-token))
+                    (opascal-indent-of last-token))
 
                    (last-token
                     ;; Indent in from the expression.
-                    (delphi-indent-of last-token delphi-indent-level))
+                    (opascal-indent-of last-token opascal-indent-level))
 
            ;; Indent in from the statement's keyword.
-           ((delphi-indent-of token delphi-indent-level)))))
+           ((opascal-indent-of token opascal-indent-level)))))
 
          ;; A delimited case statement indents the label according to
          ;; a special rule.
@@ -1156,72 +1156,72 @@ routine.")
                  (if stmt-start
                      ;; We are not actually indenting to the case statement,
                      ;; but are within a label expression.
-                     (delphi-stmt-line-indent-of
-                      stmt-start delphi-indent-level)
+                     (opascal-stmt-line-indent-of
+                      stmt-start opascal-indent-level)
                    ;; Indent from the case keyword.
-                   (delphi-stmt-line-indent-of
-                    token delphi-case-label-indent))))
+                   (opascal-stmt-line-indent-of
+                    token opascal-case-label-indent))))
 
          ;; Body expression statements are enclosing. Indent from the
          ;; statement's keyword, unless we have a non-block statement following
          ;; it.
-         ((delphi-is token-kind delphi-body-expr-statements)
+         ((opascal-is token-kind opascal-body-expr-statements)
           (throw 'done
-                 (delphi-stmt-line-indent-of
-                  (or stmt-start token) delphi-indent-level)))
+                 (opascal-stmt-line-indent-of
+                  (or stmt-start token) opascal-indent-level)))
 
          ;; An else statement is enclosing, but it doesn't have an expression.
          ;; Thus we take into account last-token instead of stmt-start.
          ((eq 'else token-kind)
-          (throw 'done (delphi-stmt-line-indent-of
-                        (or last-token token) delphi-indent-level)))
+          (throw 'done (opascal-stmt-line-indent-of
+                        (or last-token token) opascal-indent-level)))
 
          ;; We indent relative to an enclosing declaration section.
-         ((delphi-is token-kind delphi-decl-sections)
-          (throw 'done (delphi-indent-of (if last-token last-token token)
-                                         delphi-indent-level)))
+         ((opascal-is token-kind opascal-decl-sections)
+          (throw 'done (opascal-indent-of (if last-token last-token token)
+                                         opascal-indent-level)))
 
          ;; In unit sections we indent right to the left.
-         ((delphi-is token-kind delphi-unit-sections)
+         ((opascal-is token-kind opascal-unit-sections)
           (throw 'done
                  ;; Handle specially the case of "interface", which can be used
                  ;; to start either a unit section or an interface definition.
-                 (if (delphi-is token-kind delphi-interface-types)
+                 (if (opascal-is token-kind opascal-interface-types)
                      (progn
                        ;; Find the previous non-whitespace token.
                        (while (progn
                                 (setq last-token token
-                                      token (delphi-previous-token token)
-                                      token-kind (delphi-token-kind token))
+                                      token (opascal-previous-token token)
+                                      token-kind (opascal-token-kind token))
                                 (and token
-                                     (delphi-is token-kind
-                                                delphi-whitespace))))
+                                     (opascal-is token-kind
+                                                opascal-whitespace))))
                        ;; If this token is an equals sign, "interface" is being
                        ;; used to start an interface definition and we should
                        ;; treat it as a composite type; otherwise, we should
                        ;; consider it the start of a unit section.
                        (if (and token (eq token-kind 'equals))
-                           (delphi-line-indent-of last-token
-                                                  delphi-indent-level)
+                           (opascal-line-indent-of last-token
+                                                  opascal-indent-level)
                          0))
                    0)))
 
          ;; A previous terminator means we can stop.
-         ((delphi-is token-kind delphi-previous-terminators)
+         ((opascal-is token-kind opascal-previous-terminators)
           (throw 'done
               (cond ((and last-token
                           (eq 'comma token-kind)
-                          (delphi-is from-kind delphi-binary-ops))
+                          (opascal-is from-kind opascal-binary-ops))
                      ;; Align binary ops with the expression.
-                     (delphi-indent-of last-token))
+                     (opascal-indent-of last-token))
 
                     (last-token
                      ;; Indent in from the expression.
-                     (delphi-indent-of last-token delphi-indent-level))
+                     (opascal-indent-of last-token opascal-indent-level))
 
                     ;; No enclosing expression; use the previous statement's
                     ;; indent.
-                    ((delphi-previous-indent-of token)))))
+                    ((opascal-previous-indent-of token)))))
 
          ;; A block statement after an expression delimiter has its start
          ;; column as the expression statement. E.g.
@@ -1230,37 +1230,37 @@ routine.")
          ;;       //...
          ;;    end;
          ;; Remember it for when we encounter the expression statement start.
-         ((delphi-is-block-after-expr-statement token)
+         ((opascal-is-block-after-expr-statement token)
           (throw 'done
-           (cond (last-token (delphi-indent-of last-token delphi-indent-level))
+           (cond (last-token (opascal-indent-of last-token opascal-indent-level))
 
-                 ((+ (delphi-section-indent-of token) delphi-indent-level)))))
+                 ((+ (opascal-section-indent-of token) opascal-indent-level)))))
 
          ;; Assembly sections always indent in from the asm keyword.
          ((eq token-kind 'asm)
-          (throw 'done (delphi-stmt-line-indent-of token delphi-indent-level)))
+          (throw 'done (opascal-stmt-line-indent-of token opascal-indent-level)))
 
          ;; Stop at an enclosing statement and indent from it.
-         ((delphi-is token-kind delphi-enclosing-statements)
-          (throw 'done (delphi-stmt-line-indent-of
-                        (or last-token token) delphi-indent-level)))
+         ((opascal-is token-kind opascal-enclosing-statements)
+          (throw 'done (opascal-stmt-line-indent-of
+                        (or last-token token) opascal-indent-level)))
 
          ;; A class/record declaration is also enclosing.
-         ((delphi-composite-type-start token last-token)
+         ((opascal-composite-type-start token last-token)
           (throw 'done
-                 (delphi-line-indent-of last-token delphi-indent-level)))
+                 (opascal-line-indent-of last-token opascal-indent-level)))
 
          ;; A ":" we indent relative to its line beginning.  If we are in a
          ;; parameter list, then stop also if we hit a ";".
          ((and (eq token-kind 'colon)
                (not expr-delimited)
-               (not (delphi-is from-kind delphi-expr-delimiters))
+               (not (opascal-is from-kind opascal-expr-delimiters))
                (not equals-encountered)
                (not (eq from-kind 'equals)))
           (throw 'done
            (if last-token
-               (delphi-indent-of last-token delphi-indent-level)
-             (delphi-line-indent-of token delphi-indent-level 'semicolon))))
+               (opascal-indent-of last-token opascal-indent-level)
+             (opascal-line-indent-of token opascal-indent-level 'semicolon))))
 
          ;; If the ":" was not processed above and we have token after the "=",
          ;; then indent from the "=". Ignore :=, however.
@@ -1275,75 +1275,75 @@ routine.")
            ;;          + 2;
            ;; which doesn't look right.
            ;;;; Align binary ops with the before token.
-           ;;((delphi-is from-kind delphi-binary-ops)
-           ;;(throw 'done (delphi-indent-of before-equals 0)))
+           ;;((opascal-is from-kind opascal-binary-ops)
+           ;;(throw 'done (opascal-indent-of before-equals 0)))
 
            ;; Assignments (:=) we skip over to get a normal indent.
-           ((eq (delphi-token-kind last-token) 'equals))
+           ((eq (opascal-token-kind last-token) 'equals))
 
            ;; Otherwise indent in from the equals.
            ((throw 'done
-                   (delphi-indent-of before-equals delphi-indent-level)))))
+                   (opascal-indent-of before-equals opascal-indent-level)))))
 
          ;; Remember any "=" we encounter if it has not already been processed.
          ((eq token-kind 'equals)
           (setq equals-encountered token
                 before-equals last-token))
          )
-        (unless (delphi-is token-kind delphi-whitespace)
+        (unless (opascal-is token-kind opascal-whitespace)
            (setq last-token token))
-        (setq token (delphi-previous-token token)))
+        (setq token (opascal-previous-token token)))
       ;; We ran out of tokens. Indent to column 0.
       0)))
 
-(defun delphi-corrected-indentation ()
+(defun opascal-corrected-indentation ()
   ;; Returns the corrected indentation for the current line.
-  (delphi-save-excursion
-    (delphi-progress-start)
+  (opascal-save-excursion
+    (opascal-progress-start)
     ;; Move to the first token on the line.
     (beginning-of-line)
-    (skip-chars-forward delphi-space-chars)
-    (let* ((token (delphi-current-token))
-           (token-kind (delphi-token-kind token))
+    (skip-chars-forward opascal-space-chars)
+    (let* ((token (opascal-current-token))
+           (token-kind (opascal-token-kind token))
            (indent
             (cond ((eq 'close-group token-kind)
                    ;; Indent to the matching start ( or [.
-                   (delphi-indent-of (delphi-group-start token)))
+                   (opascal-indent-of (opascal-group-start token)))
 
-                  ((delphi-is token-kind delphi-unit-statements) 0)
+                  ((opascal-is token-kind opascal-unit-statements) 0)
 
-                  ((delphi-is token-kind delphi-comments)
+                  ((opascal-is token-kind opascal-comments)
                    ;; In a comment.
-                   (delphi-comment-indent-of token))
+                   (opascal-comment-indent-of token))
 
-                  ((delphi-is token-kind delphi-decl-matchers)
+                  ((opascal-is token-kind opascal-decl-matchers)
                    ;; Use a previous section/routine's indent.
-                   (delphi-section-indent-of token))
+                   (opascal-section-indent-of token))
 
-                  ((delphi-is token-kind delphi-match-block-statements)
+                  ((opascal-is token-kind opascal-match-block-statements)
                    ;; Use the block's indentation.
                    (let ((block-start
-                          (delphi-block-start token 'stop-on-class)))
+                          (opascal-block-start token 'stop-on-class)))
                      (cond
                       ;; When trailing a body statement, indent to
                       ;; the statement's keyword.
-                      ((delphi-is-block-after-expr-statement block-start)
-                       (delphi-section-indent-of block-start))
+                      ((opascal-is-block-after-expr-statement block-start)
+                       (opascal-section-indent-of block-start))
 
                       ;; Otherwise just indent to the block start.
-                      ((delphi-stmt-line-indent-of block-start 0)))))
+                      ((opascal-stmt-line-indent-of block-start 0)))))
 
                   ((eq 'else token-kind)
                    ;; Find the start of the if or case statement.
-                   (delphi-stmt-line-indent-of (delphi-else-start token) 0))
+                   (opascal-stmt-line-indent-of (opascal-else-start token) 0))
 
                   ;; Otherwise indent in from enclosing statement.
-                  ((delphi-enclosing-indent-of
-                    (if token token (delphi-token-at (1- (point)))))))))
-      (delphi-progress-done)
+                  ((opascal-enclosing-indent-of
+                    (if token token (opascal-token-at (1- (point)))))))))
+      (opascal-progress-done)
       indent)))
 
-(defun delphi-indent-line ()
+(defun opascal-indent-line ()
   "Indent the current line according to the current language construct.
 If before the indent, the point is moved to the indent."
   (interactive)
@@ -1354,9 +1354,9 @@ If before the indent, the point is moved to the indent."
          (new-indent 0))
      (beginning-of-line)
      (setq line-start (point))
-     (skip-chars-forward delphi-space-chars)
+     (skip-chars-forward opascal-space-chars)
      (setq old-indent (current-column))
-     (setq new-indent (delphi-corrected-indentation))
+     (setq new-indent (opascal-corrected-indentation))
      (if (< marked-point (point))
          ;; If before the indent column, then move to it.
          (set-marker marked-point (point)))
@@ -1368,17 +1368,17 @@ If before the indent, the point is moved to the indent."
      (goto-char marked-point)
      (set-marker marked-point nil))))
 
-(defvar delphi-mode-abbrev-table nil
-  "Abbrev table in use in Delphi mode buffers.")
-(define-abbrev-table 'delphi-mode-abbrev-table ())
+(defvar opascal-mode-abbrev-table nil
+  "Abbrev table in use in OPascal mode buffers.")
+(define-abbrev-table 'opascal-mode-abbrev-table ())
 
-(defmacro delphi-ensure-buffer (buffer-var buffer-name)
+(defmacro opascal-ensure-buffer (buffer-var buffer-name)
   ;; Ensures there exists a buffer of the specified name in the specified
   ;; variable.
   `(when (not (buffer-live-p ,buffer-var))
      (setq ,buffer-var (get-buffer-create ,buffer-name))))
 
-(defun delphi-log-msg (to-buffer the-msg)
+(defun opascal-log-msg (to-buffer the-msg)
   ;; Writes a message to the end of the specified buffer.
   (with-current-buffer to-buffer
     (save-selected-window
@@ -1389,103 +1389,103 @@ If before the indent, the point is moved to the indent."
 
 ;; Debugging helpers:
 
-(defvar delphi-debug-buffer nil
-  "Buffer to write Delphi mode debug messages to.  Created on demand.")
+(defvar opascal-debug-buffer nil
+  "Buffer to write OPascal mode debug messages to.  Created on demand.")
 
-(defun delphi-debug-log (format-string &rest args)
+(defun opascal-debug-log (format-string &rest args)
   ;; Writes a message to the log buffer.
-  (when delphi-debug
-    (delphi-ensure-buffer delphi-debug-buffer "*Delphi Debug Log*")
-    (delphi-log-msg delphi-debug-buffer
+  (when opascal-debug
+    (opascal-ensure-buffer opascal-debug-buffer "*OPascal Debug Log*")
+    (opascal-log-msg opascal-debug-buffer
                     (concat (format-time-string "%H:%M:%S " (current-time))
                             (apply #'format (cons format-string args))
                             "\n"))))
 
-(defun delphi-debug-token-string (token)
-  (let* ((image (delphi-token-string token))
+(defun opascal-debug-token-string (token)
+  (let* ((image (opascal-token-string token))
          (has-newline (string-match "^\\([^\n]*\\)\n\\(.+\\)?$" image)))
     (when has-newline
        (setq image (concat (match-string 1 image)
                            (if (match-beginning 2) "..."))))
     image))
 
-(defun delphi-debug-show-current-token ()
+(defun opascal-debug-show-current-token ()
   (interactive)
-  (let ((token (delphi-current-token)))
-    (delphi-debug-log "Token: %S %S" token (delphi-debug-token-string token))))
+  (let ((token (opascal-current-token)))
+    (opascal-debug-log "Token: %S %S" token (opascal-debug-token-string token))))
 
-(defun delphi-debug-goto-point (p)
+(defun opascal-debug-goto-point (p)
   (interactive "NGoto char: ")
   (goto-char p))
 
-(defun delphi-debug-goto-next-token ()
+(defun opascal-debug-goto-next-token ()
   (interactive)
-  (goto-char (delphi-token-start (delphi-next-token (delphi-current-token)))))
+  (goto-char (opascal-token-start (opascal-next-token (opascal-current-token)))))
 
-(defun delphi-debug-goto-previous-token ()
+(defun opascal-debug-goto-previous-token ()
   (interactive)
   (goto-char
-   (delphi-token-start (delphi-previous-token (delphi-current-token)))))
+   (opascal-token-start (opascal-previous-token (opascal-current-token)))))
 
-(defun delphi-debug-show-current-string (from to)
+(defun opascal-debug-show-current-string (from to)
   (interactive "r")
-  (delphi-debug-log "String: %S" (buffer-substring from to)))
+  (opascal-debug-log "String: %S" (buffer-substring from to)))
 
-(defun delphi-debug-tokenize-region (from to)
+(defun opascal-debug-tokenize-region (from to)
   (interactive)
-  (delphi-save-excursion
-   (delphi-progress-start)
+  (opascal-save-excursion
+   (opascal-progress-start)
    (goto-char from)
    (while (< (point) to)
-     (goto-char (delphi-token-end (delphi-current-token)))
-     (delphi-step-progress (point) "Tokenizing" delphi-scanning-progress-step))
-   (delphi-progress-done "Tokenizing done")))
+     (goto-char (opascal-token-end (opascal-current-token)))
+     (opascal-step-progress (point) "Tokenizing" opascal-scanning-progress-step))
+   (opascal-progress-done "Tokenizing done")))
 
-(defun delphi-debug-tokenize-buffer ()
+(defun opascal-debug-tokenize-buffer ()
   (interactive)
-  (delphi-debug-tokenize-region (point-min) (point-max)))
+  (opascal-debug-tokenize-region (point-min) (point-max)))
 
-(defun delphi-debug-tokenize-window ()
+(defun opascal-debug-tokenize-window ()
   (interactive)
-  (delphi-debug-tokenize-region (window-start) (window-end)))
+  (opascal-debug-tokenize-region (window-start) (window-end)))
 
 
-(defun delphi-tab ()
+(defun opascal-tab ()
   "Indent the region, if Transient Mark mode is on and the region is active.
 Otherwise, indent the current line or insert a TAB, depending on the
-value of `delphi-tab-always-indents' and the current line position."
+value of `opascal-tab-always-indents' and the current line position."
   (interactive)
   (cond ((use-region-p)
          ;; If Transient Mark mode is enabled and the region is active, indent
          ;; the entire region.
          (indent-region (region-beginning) (region-end)))
-        ((or delphi-tab-always-indents
-             (save-excursion (skip-chars-backward delphi-space-chars) (bolp)))
+        ((or opascal-tab-always-indents
+             (save-excursion (skip-chars-backward opascal-space-chars) (bolp)))
          ;; Otherwise, if we are configured always to indent (regardless of the
          ;; point's position in the line) or we are before the first non-space
          ;; character on the line, indent the line.
-         (delphi-indent-line))
+         (opascal-indent-line))
         (t
          ;; Otherwise, insert a tab character.
          (insert "\t"))))
 
-(make-obsolete 'delphi-tab 'indent-for-tab-command "24.4")
+(make-obsolete 'opascal-tab 'indent-for-tab-command "24.4")
 
-(defun delphi-is-directory (path)
+(defun opascal-is-directory (path)
   ;; True if the specified path is an existing directory.
   (let ((attributes (file-attributes path)))
     (and attributes (car attributes))))
 
-(defun delphi-is-file (path)
+(defun opascal-is-file (path)
   ;; True if the specified file exists as a file.
   (let ((attributes (file-attributes path)))
     (and attributes (null (car attributes)))))
 
-(defun delphi-search-directory (unit dir &optional recurse)
+(defun opascal-search-directory (unit dir &optional recurse)
   ;; Searches for the unit in the specified directory. If recurse is true, then
   ;; the directory is recursively searched. File name comparison is done in a
   ;; case insensitive manner.
-  (when (delphi-is-directory dir)
+  (when (opascal-is-directory dir)
     (let ((files (directory-files dir))
           (unit-file (downcase unit)))
       (catch 'done
@@ -1493,14 +1493,14 @@ value of `delphi-tab-always-indents' and the current line position."
         (dolist (file files)
           (let ((path (concat dir "/" file)))
             (if (and (string= unit-file (downcase file))
-                     (delphi-is-file path))
+                     (opascal-is-file path))
                 (throw 'done path))))
 
         ;; Not found. Search subdirectories.
         (when recurse
           (dolist (subdir files)
             (unless (member subdir '("." ".."))
-              (let ((path (delphi-search-directory
+              (let ((path (opascal-search-directory
                            unit (concat dir "/" subdir) recurse)))
                 (if path (throw 'done path))))))
 
@@ -1508,7 +1508,7 @@ value of `delphi-tab-always-indents' and the current line position."
         nil))))
 
 
-(defun delphi-find-unit-in-directory (unit dir)
+(defun opascal-find-unit-in-directory (unit dir)
   ;; Searches for the unit in the specified directory. If the directory ends
   ;; in \"...\", then it is recursively searched.
   (let ((dir-name dir)
@@ -1520,89 +1520,89 @@ value of `delphi-tab-always-indents' and the current line position."
     ;; Ensure the trailing slash is removed.
     (if (string-match "^\\(.+\\)[\\\\/]$" dir-name)
         (setq dir-name (match-string 1 dir-name)))
-    (delphi-search-directory unit dir-name recurse)))
+    (opascal-search-directory unit dir-name recurse)))
 
-(defun delphi-find-unit-file (unit)
-  ;; Finds the specified delphi source file according to `delphi-search-path'.
+(defun opascal-find-unit-file (unit)
+  ;; Finds the specified opascal source file according to `opascal-search-path'.
   ;; If found, the full path is returned, otherwise nil is returned.
   (catch 'done
-    (cond ((null delphi-search-path)
-           (delphi-find-unit-in-directory unit "."))
+    (cond ((null opascal-search-path)
+           (opascal-find-unit-in-directory unit "."))
 
-          ((stringp delphi-search-path)
-           (delphi-find-unit-in-directory unit delphi-search-path))
+          ((stringp opascal-search-path)
+           (opascal-find-unit-in-directory unit opascal-search-path))
 
-          ((dolist (dir delphi-search-path)
-             (let ((file (delphi-find-unit-in-directory unit dir)))
+          ((dolist (dir opascal-search-path)
+             (let ((file (opascal-find-unit-in-directory unit dir)))
                (if file (throw 'done file))))))
     nil))
 
-(defun delphi-find-unit (unit)
-  "Find the specified Delphi source file according to `delphi-search-path'.
+(defun opascal-find-unit (unit)
+  "Find the specified OPascal source file according to `opascal-search-path'.
 If no extension is specified, .pas is assumed.  Creates a buffer for the unit."
   (interactive "sOPascal unit name: ")
   (let* ((unit-file (if (string-match "^\\(.*\\)\\.[a-z]+$" unit)
                         unit
                       (concat unit ".pas")))
-         (file (delphi-find-unit-file unit-file)))
+         (file (opascal-find-unit-file unit-file)))
     (if (null file)
         (error "unit not found: %s" unit-file)
       (find-file file)
-      (if (not (derived-mode-p 'delphi-mode))
-          (delphi-mode)))
+      (if (not (derived-mode-p 'opascal-mode))
+          (opascal-mode)))
     file))
 
-(defun delphi-find-current-def ()
+(defun opascal-find-current-def ()
   "Find the definition of the identifier under the current point."
   (interactive)
-  (error "delphi-find-current-def: not implemented yet"))
+  (error "opascal-find-current-def: not implemented yet"))
 
-(defun delphi-find-current-xdef ()
+(defun opascal-find-current-xdef ()
   "Find the definition of the identifier under the current point, searching
 in external units if necessary (as listed in the current unit's use clause).
 The set of directories to search for a unit is specified by the global variable
-`delphi-search-path'."
+`opascal-search-path'."
   (interactive)
-  (error "delphi-find-current-xdef: not implemented yet"))
+  (error "opascal-find-current-xdef: not implemented yet"))
 
-(defun delphi-find-current-body ()
+(defun opascal-find-current-body ()
   "Find the body of the identifier under the current point, assuming
 it is a routine."
   (interactive)
-  (error "delphi-find-current-body: not implemented yet"))
+  (error "opascal-find-current-body: not implemented yet"))
 
-(defun delphi-fill-comment ()
+(defun opascal-fill-comment ()
   "Fill the text of the current comment, according to `fill-column'.
 An error is raised if not in a comment."
   (interactive)
   (save-excursion
     (save-restriction
-    (let* ((comment (delphi-current-token))
-           (comment-kind (delphi-token-kind comment)))
-      (if (not (delphi-is comment-kind delphi-comments))
+    (let* ((comment (opascal-current-token))
+           (comment-kind (opascal-token-kind comment)))
+      (if (not (opascal-is comment-kind opascal-comments))
           (error "Not in a comment")
-        (let* ((start-comment (delphi-comment-block-start comment))
-               (end-comment (delphi-comment-block-end comment))
+        (let* ((start-comment (opascal-comment-block-start comment))
+               (end-comment (opascal-comment-block-end comment))
                ;; FIXME: Don't abuse global variables like `comment-end/start'.
-               (comment-start (delphi-token-start start-comment))
-               (comment-end (delphi-token-end end-comment))
-               (content-start (delphi-comment-content-start start-comment))
-               (content-indent (delphi-column-of content-start))
+               (comment-start (opascal-token-start start-comment))
+               (comment-end (opascal-token-end end-comment))
+               (content-start (opascal-comment-content-start start-comment))
+               (content-indent (opascal-column-of content-start))
                (content-prefix (make-string content-indent ?\s))
-               (content-prefix-re delphi-leading-spaces-re)
+               (content-prefix-re opascal-leading-spaces-re)
                (p nil)
                (marked-point (point-marker))) ; Maintain our position reliably.
           (when (eq 'comment-single-line comment-kind)
             ;; // style comments need more work.
             (setq content-prefix
-                  (let ((comment-indent (delphi-column-of comment-start)))
+                  (let ((comment-indent (opascal-column-of comment-start)))
                     (concat (make-string comment-indent ?\s) "//"
                             (make-string (- content-indent comment-indent 2)
                                          ?\s)))
-                  content-prefix-re (concat delphi-leading-spaces-re
+                  content-prefix-re (concat opascal-leading-spaces-re
                                             "//"
-                                            delphi-spaces-re)
-                  comment-end (if (delphi-is-literal-end comment-end)
+                                            opascal-spaces-re)
+                  comment-end (if (opascal-is-literal-end comment-end)
                                   ;; Don't include the trailing newline.
                                   (1- comment-end)
                                 comment-end)))
@@ -1653,49 +1653,49 @@ An error is raised if not in a comment."
           (goto-char marked-point)
           (set-marker marked-point nil)))))))
 
-(defun delphi-new-comment-line ()
+(defun opascal-new-comment-line ()
   "If in a // comment, do a newline, indented such that one is still in the
 comment block.  If not in a // comment, just does a normal newline."
   (interactive)
-  (let ((comment (delphi-current-token)))
-    (if (not (eq 'comment-single-line (delphi-token-kind comment)))
+  (let ((comment (opascal-current-token)))
+    (if (not (eq 'comment-single-line (opascal-token-kind comment)))
         ;; Not in a // comment. Just do the normal newline.
         (newline)
-      (let* ((start-comment (delphi-comment-block-start comment))
-             (comment-start (delphi-token-start start-comment))
-             (content-start (delphi-comment-content-start start-comment))
+      (let* ((start-comment (opascal-comment-block-start comment))
+             (comment-start (opascal-token-start start-comment))
+             (content-start (opascal-comment-content-start start-comment))
              (prefix
-              (concat (make-string (delphi-column-of comment-start) ?\s) "//"
+              (concat (make-string (opascal-column-of comment-start) ?\s) "//"
                       (make-string (- content-start comment-start 2) ?\s))))
         (delete-horizontal-space)
         (insert "\n" prefix)))))
 
-(defun delphi-match-token (token limit)
+(defun opascal-match-token (token limit)
   ;; Sets the match region used by (match-string 0) and friends to the token's
   ;; region.  Sets the current point to the end of the token (or limit).
   (set-match-data nil)
   (if token
-      (let ((end (min (delphi-token-end token) limit)))
-        (set-match-data (list (delphi-token-start token) end))
+      (let ((end (min (opascal-token-end token) limit)))
+        (set-match-data (list (opascal-token-start token) end))
         (goto-char end)
         token)))
 
-(defconst delphi-font-lock-keywords
+(defconst opascal-font-lock-keywords
   `(("\\_<\\(function\\|pro\\(cedure\\|gram\\)\\)[ \t]+\\([[:alpha:]][[:alnum:]_]*\\)"
      (1 font-lock-keyword-face) (3 font-lock-function-name-face))
-    ,(concat "\\_<" (regexp-opt (mapcar #'symbol-name delphi-keywords))
+    ,(concat "\\_<" (regexp-opt (mapcar #'symbol-name opascal-keywords))
               "\\_>")))
 
-(defconst delphi-font-lock-defaults
-  '(delphi-font-lock-keywords
+(defconst opascal-font-lock-defaults
+  '(opascal-font-lock-keywords
     nil ; Syntactic fontification does apply.
     nil ; Don't care about case since we don't use regexps to find tokens.
     nil ; Syntax alists don't apply.
     nil ; Syntax begin movement doesn't apply.
     )
-  "Delphi mode font-lock defaults.  Syntactic fontification is ignored.")
+  "OPascal mode font-lock defaults.  Syntactic fontification is ignored.")
 
-(defconst delphi--syntax-propertize
+(defconst opascal--syntax-propertize
   (syntax-propertize-rules
    ;; The syntax-table settings are too coarse and end up treating /* and (/
    ;; as comment starters.  Fix it here by removing the "2" from the syntax
@@ -1711,76 +1711,76 @@ comment block.  If not in a // comment, just does a normal newline."
                      (forward-char -1)
                      nil)))))
 
-(defvar delphi-debug-mode-map
+(defvar opascal-debug-mode-map
   (let ((kmap (make-sparse-keymap)))
-    (dolist (binding '(("n" delphi-debug-goto-next-token)
-                       ("p" delphi-debug-goto-previous-token)
-                       ("t" delphi-debug-show-current-token)
-                       ("T" delphi-debug-tokenize-buffer)
-                       ("W" delphi-debug-tokenize-window)
-                       ("g" delphi-debug-goto-point)
-                       ("s" delphi-debug-show-current-string)))
+    (dolist (binding '(("n" opascal-debug-goto-next-token)
+                       ("p" opascal-debug-goto-previous-token)
+                       ("t" opascal-debug-show-current-token)
+                       ("T" opascal-debug-tokenize-buffer)
+                       ("W" opascal-debug-tokenize-window)
+                       ("g" opascal-debug-goto-point)
+                       ("s" opascal-debug-show-current-string)))
       (define-key kmap (car binding) (cadr binding)))
     kmap)
-  "Keystrokes for Delphi mode debug commands.")
+  "Keystrokes for OPascal mode debug commands.")
 
-(defvar delphi-mode-map
+(defvar opascal-mode-map
   (let ((kmap (make-sparse-keymap)))
     (dolist (binding
-             (list ;; '("\C-cd" delphi-find-current-def)
-                   ;; '("\C-cx" delphi-find-current-xdef)
-                   ;; '("\C-cb" delphi-find-current-body)
-                   '("\C-cu" delphi-find-unit)
-                   '("\M-q" delphi-fill-comment)
-                   '("\M-j" delphi-new-comment-line)
+             (list ;; '("\C-cd" opascal-find-current-def)
+                   ;; '("\C-cx" opascal-find-current-xdef)
+                   ;; '("\C-cb" opascal-find-current-body)
+                   '("\C-cu" opascal-find-unit)
+                   '("\M-q" opascal-fill-comment)
+                   '("\M-j" opascal-new-comment-line)
                    ;; Debug bindings:
-                   (list "\C-c\C-d" delphi-debug-mode-map)))
+                   (list "\C-c\C-d" opascal-debug-mode-map)))
       (define-key kmap (car binding) (cadr binding)))
     kmap)
-  "Keymap used in Delphi mode.")
+  "Keymap used in OPascal mode.")
 
 (define-obsolete-variable-alias 'delphi-mode-hook 'opascal-mode-hook "24.4")
 ;;;###autoload
 (define-obsolete-function-alias 'delphi-mode 'opascal-mode "24.4")
 ;;;###autoload
-(define-derived-mode delphi-mode prog-mode "Delphi"
-  "Major mode for editing Delphi code.\\<delphi-mode-map>
-\\[delphi-find-unit]\t- Search for a Delphi source file.
-\\[delphi-fill-comment]\t- Fill the current comment.
-\\[delphi-new-comment-line]\t- If in a // comment, do a new comment line.
+(define-derived-mode opascal-mode prog-mode "OPascal"
+  "Major mode for editing OPascal code.\\<opascal-mode-map>
+\\[opascal-find-unit]\t- Search for a OPascal source file.
+\\[opascal-fill-comment]\t- Fill the current comment.
+\\[opascal-new-comment-line]\t- If in a // comment, do a new comment line.
 
 \\[indent-region] also works for indenting a whole region.
 
 Customization:
 
- `delphi-indent-level'                (default 3)
-    Indentation of Delphi statements with respect to containing block.
- `delphi-compound-block-indent'       (default 0)
+ `opascal-indent-level'                (default 3)
+    Indentation of OPascal statements with respect to containing block.
+ `opascal-compound-block-indent'       (default 0)
     Extra indentation for blocks in compound statements.
- `delphi-case-label-indent'           (default 0)
+ `opascal-case-label-indent'           (default 0)
     Extra indentation for case statement labels.
- `delphi-search-path'                 (default .)
+ `opascal-search-path'                 (default .)
     Directories to search when finding external units.
- `delphi-verbose'                     (default nil)
-    If true then Delphi token processing progress is reported to the user.
+ `opascal-verbose'                     (default nil)
+    If true then OPascal token processing progress is reported to the user.
 
 Coloring:
 
- `delphi-keyword-face'                (default `font-lock-keyword-face')
-    Face used to color Delphi keywords."
+ `opascal-keyword-face'                (default `font-lock-keyword-face')
+    Face used to color OPascal keywords."
 
   ;; Buffer locals:
-  (setq-local indent-line-function #'delphi-indent-line)
-  (setq-local comment-indent-function #'delphi-indent-line)
+  (setq-local indent-line-function #'opascal-indent-line)
+  (setq-local comment-indent-function #'opascal-indent-line)
   (setq-local case-fold-search t)
-  (setq-local delphi-progress-last-reported-point nil)
-  (setq-local font-lock-defaults delphi-font-lock-defaults)
-  (setq-local tab-always-indent delphi-tab-always-indents)
-  (setq-local syntax-propertize-function delphi--syntax-propertize)
+  (setq-local opascal-progress-last-reported-point nil)
+  (setq-local font-lock-defaults opascal-font-lock-defaults)
+  (setq-local tab-always-indent opascal-tab-always-indents)
+  (setq-local syntax-propertize-function opascal--syntax-propertize)
 
   (setq-local comment-start "// ")
   (setq-local comment-start-skip "\\(?://\\|(\\*\\|{\\)[ \t]*")
   (setq-local comment-end-skip "[ \t]*\\(?:\n\\|\\*)\\|}\\)"))
 
-(provide 'delphi)
-;;; delphi.el ends here
+(provide 'opascal)
+;;; opascal.el ends here
