@@ -4,8 +4,9 @@
 
 ;; Authors: Ray Blaak <blaak@infomatch.com>,
 ;;          Simon South <ssouth@member.fsf.org>
-;; Maintainer: Simon South <ssouth@member.fsf.org>
+;; Maintainer: Maksim Golubev <maksim.golubev72@gmail.com>
 ;; Keywords: languages
+;; Version: 20151218.5
 
 ;; This file is part of GNU Emacs.
 
