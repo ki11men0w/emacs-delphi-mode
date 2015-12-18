@@ -946,17 +946,9 @@ routine.")
          ;; Ignore whitespace.
          ((opascal-is token-kind opascal-whitespace))
 
-         ;; Remember any "of" we encounter, since that affects how we
-         ;; indent to a case statement within a record declaration
-         ;; (i.e. a variant part).
-         ((eq 'of token-kind)
-          (setq last-of token))
-
-         ;; Remember any ':' we encounter (until we reach an "of"),
-         ;; since that affects how we indent to case statements in
-         ;; general.
-         ((eq 'colon token-kind)
-          (unless last-of (setq last-colon token)))
+         ;; Remember any ':' we encounter, since that affects how we indent to
+         ;; a case statement.
+         ((eq 'colon token-kind) (setq last-colon token))
 
          ;; A case statement delimits a previous statement. We indent labels
          ;; specially.
