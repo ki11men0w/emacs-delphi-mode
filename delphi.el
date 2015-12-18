@@ -158,7 +158,7 @@ That is, regardless of where in the line point is at the time."
   '(procedure function constructor destructor property)
   "Marks the start of a routine, or routine-ish looking expression.")
 
-(defconst opascal-body-expr-statements '(if while for on)
+(defconst opascal-body-expr-statements '(if while for on with)
   "Statements that have either a single statement or a block as a body and also
 are followed by an expression.")
 
@@ -223,7 +223,8 @@ are followed by an expression.")
   "Statements that a declaration statement should align with.")
 
 (defconst opascal-decl-matchers
-  `(begin ,@opascal-decl-sections)
+;;  `(begin ,@opascal-decl-sections)
+  `(,@opascal-block-statements ,@opascal-decl-sections)
   "Statements that should match to declaration statement indentation.")
 
 (defconst opascal-enclosing-statements
@@ -471,6 +472,7 @@ routine.")
   ;; character set.
   (let ((currp (point))
         (end nil)
+        (start nil)
         (token nil))
     (goto-char p)
     (when (> (skip-chars-forward charset) 0)
@@ -508,9 +510,7 @@ routine.")
 (defun opascal-token-at (p)
   ;; Returns the token from parsing text at point p.
   (when (and (<= (point-min) p) (<= p (point-max)))
-     (cond ((opascal-char-token-at p ?\n 'newline))
-
-           ((opascal-literal-token-at p))
+     (cond ((opascal-literal-token-at p))
 
            ((opascal-space-token-at p))
 
@@ -520,6 +520,7 @@ routine.")
            ((opascal-char-token-at p ?\) 'close-group))
            ((opascal-char-token-at p ?\[ 'open-group))
            ((opascal-char-token-at p ?\] 'close-group))
+           ((opascal-char-token-at p ?\n 'newline))
            ((opascal-char-token-at p ?\; 'semicolon))
            ((opascal-char-token-at p ?. 'dot))
            ((opascal-char-token-at p ?, 'comma))
@@ -732,6 +733,7 @@ routine.")
                              (opascal-previous-token enclosing-token))
                          token))
                    token)))
+         ;;((opascal-is token-kind opascal-block-statements) (throw 'done token))
 
          ;; A class/record start also begins a block.
          ((opascal-composite-type-start token last-token)
@@ -747,7 +749,8 @@ routine.")
   ;; Returns the token of the if or case statement.
   (let ((token (opascal-previous-token from-else))
         (token-kind nil)
-        (semicolon-count 0))
+        (semicolon-count 0)
+        (if-count 0))
     (catch 'done
       (while token
         (setq token-kind (opascal-token-kind token))
@@ -795,7 +798,8 @@ routine.")
       comment
     ;; Scan until we run out of // comments.
     (let ((prev-comment comment)
-          (start-comment comment))
+          (start-comment comment)
+          (kind nil))
       (while (let ((kind (opascal-token-kind prev-comment)))
                (cond ((eq kind 'space))
                      ((eq kind 'comment-single-line)
@@ -812,7 +816,8 @@ routine.")
       comment
     ;; Scan until we run out of // comments.
     (let ((next-comment comment)
-          (end-comment comment))
+          (end-comment comment)
+          (kind nil))
       (while (let ((kind (opascal-token-kind next-comment)))
                (cond ((eq kind 'space))
                      ((eq kind 'comment-single-line)
@@ -898,7 +903,6 @@ routine.")
         (token-kind nil)
         (from-kind (opascal-token-kind from-token))
         (last-colon nil)
-        (last-of nil)
         (last-token nil))
     (catch 'done
       (while token
@@ -1349,6 +1353,7 @@ If before the indent, the point is moved to the indent."
   (interactive)
   (save-match-data
    (let ((marked-point (point-marker))  ; Maintain our position reliably.
+         (new-point nil)
          (line-start nil)
          (old-indent 0)
          (new-indent 0))
@@ -1549,6 +1554,7 @@ If no extension is specified, .pas is assumed.  Creates a buffer for the unit."
         (error "unit not found: %s" unit-file)
       (find-file file)
       (if (not (derived-mode-p 'opascal-mode))
+      ;;(if (not (eq major-mode 'opascal-mode))
           (opascal-mode)))
     file))
 
