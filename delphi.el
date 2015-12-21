@@ -4,8 +4,9 @@
 
 ;; Authors: Ray Blaak <blaak@infomatch.com>,
 ;;          Simon South <ssouth@member.fsf.org>
-;; Maintainer: Simon South <ssouth@member.fsf.org>
+;; Maintainer: Maksim Golubev <maksim.golubev72@gmail.com>
 ;; Keywords: languages
+;; Version: 20151218.5
 
 ;; This file is part of GNU Emacs.
 
@@ -1742,7 +1743,7 @@ comment block.  If not in a // comment, just does a normal newline."
 ;;;###autoload
 (define-obsolete-function-alias 'delphi-mode 'opascal-mode "24.4")
 ;;;###autoload
-(define-derived-mode opascal-mode prog-mode "OPascal"
+(define-derived-mode opascal-mode prog-mode "OPascal'"
   "Major mode for editing OPascal code.\\<opascal-mode-map>
 \\[opascal-find-unit]\t- Search for a OPascal source file.
 \\[opascal-fill-comment]\t- Fill the current comment.
